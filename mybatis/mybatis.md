@@ -8,7 +8,7 @@
 
 ##### 1、MyBatis配置文件
 
-###### sqlMappConfig.xml
+###### 1.1  sqlMappConfig.xml
 
 MyBatis核心配置文件，约定俗成命名为sqlMappConfig.xml。主要用于配置数据库信息和加载mapper.xml映射。
 
@@ -114,7 +114,7 @@ PS：idea约束头报错URI is not registered (Settings | Languages & Frameworks
 
 ![image-20210131234649589](mybatis.assets/image-20210131234649589.png)
 
-###### mapper.xml
+###### 1.2  mapper.xml
 
 MyBatis映射配置文件，定义管理对象数据SQL
 
@@ -245,7 +245,7 @@ MyBatis映射配置文件，定义管理对象数据SQL
 
   ![image-20210213232920938](mybatis.assets/image-20210213232920938.png)
 
-##### 2、MyBatis执行的API
+##### 3、MyBatis执行的API
 
 ```java
     @Test
@@ -274,7 +274,7 @@ MyBatis映射配置文件，定义管理对象数据SQL
     }
 ```
 
-##### 3、MyBatis的dao层代理开发
+##### 4、MyBatis的dao层代理开发
 
 ![image-20210204002739200](mybatis.assets/image-20210204002739200.png)
 
@@ -282,7 +282,61 @@ namespace为dao接口的相对路径
 
 sql语句标签的id为dao接口的对用方法，parameterType为方法参数类型，resultType为返回结果类型
 
-##### 
 
 
+#### 二、MyBatis缓存
 
+##### 1、一级缓存
+
+一级缓存默认开启，为sqlSession级别，进行增删改操作时为清空sqlSession中的缓存
+
+![image-20210219220214264](mybatis.assets/image-20210219220214264.png)
+
+###### 1.1  一级缓存底层结构
+
+一级缓存的底层结构是一个HashMap，key为CacheKey对象，由MappedStatement id、分页参数offset、limit和具体sql组成，重写equals和hashCode方法。
+
+![image-20210219221231160](mybatis.assets/image-20210219221231160.png)
+
+![image-20210219221532897](mybatis.assets/image-20210219221532897.png)
+
+###### 1.2  一级缓存创建使用流程
+
+CachingExecutor 从内存中获取数据， 在查找数据库前先查找缓存，若没有找到的话调用delegate从数据库查询，并将查询结果存入缓存中。
+
+![image-20210219225323612](mybatis.assets/image-20210219225323612.png)
+
+![image-20210219225520757](mybatis.assets/image-20210219225520757.png)
+
+![image-20210219223910091](mybatis.assets/image-20210219223910091.png)
+
+##### 2、二级缓存
+
+二级缓存默认不开启，为namespace级别，即被多个sqlSession共享
+
+![image-20210220074634412](mybatis.assets/image-20210220074634412.png)
+
+![image-20210220074807635](mybatis.assets/image-20210220074807635.png)
+
+###### 2.1  开启二级缓存
+
+* 对应实体类必须实现Serializable接口
+
+* 全局配置文件sqlMapConfig.xml中加入对应配置（settings标签应在properties标签后）
+
+  ```xml
+  <!--开启⼆级缓存-->
+  <settings>
+  	<setting name="cacheEnabled" value="true"/>
+  </settings>
+  ```
+
+  ![image-20210220074001450](mybatis.assets/image-20210220074001450.png)
+
+* mapper xml中加上cache标签，注解方式则在对应mapper接口加上@CacheNamespace注解
+
+  ```xml
+  <cache/>
+  ```
+
+  ![image-20210220072814024](mybatis.assets/image-20210220072814024.png)
