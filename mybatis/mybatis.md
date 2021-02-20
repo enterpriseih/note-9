@@ -312,7 +312,7 @@ CachingExecutor 从内存中获取数据， 在查找数据库前先查找缓存
 
 ##### 2、二级缓存
 
-二级缓存默认不开启，为namespace级别，即被多个sqlSession共享
+​		二级缓存底层结构还是HashMap，默认不开启。为namespace级别，即被多个sqlSession共享。进行增删改操作时清空缓存。二级缓存缓存的不是对象，而是数据，读取二级缓存的时候底层会重新创建一个对象，将缓存的数据赋值上。
 
 ![image-20210220074634412](mybatis.assets/image-20210220074634412.png)
 
@@ -333,10 +333,49 @@ CachingExecutor 从内存中获取数据， 在查找数据库前先查找缓存
 
   ![image-20210220074001450](mybatis.assets/image-20210220074001450.png)
 
-* mapper xml中加上cache标签，注解方式则在对应mapper接口加上@CacheNamespace注解
+* mapper xml中加上cache标签，注解方式则在对应mapper接口加上@CacheNamespace注解。可配置自定义缓存实现，实现Cache接口，配置具体实现类的路径
 
   ```xml
-  <cache/>
+  <cache type="org.apache.ibatis.cache.impl.PerpetualCache"/>
   ```
 
-  ![image-20210220072814024](mybatis.assets/image-20210220072814024.png)
+  ![image-20210220214322614](mybatis.assets/image-20210220214322614.png)
+
+###### 2.2  useCache和flushCache
+
+​		userCache是否禁⽤⼆级缓存，默认true；flushCache是否刷新缓存，默认true
+
+​		xml配置方式
+
+```xml
+<select id="selectUserByUserId" flushCache="true" useCache="false"
+	resultType="com.lagou.pojo.User" parameterType="int">
+	select * from user where id=#{id}
+</select>
+```
+
+​		注解方式
+
+![image-20210220213435642](mybatis.assets/image-20210220213435642.png)
+
+###### 2.3  redis实现二级缓存
+
+* pom.xml导入对应redis实现mybatis二级缓存的依赖
+
+  ```xml
+  <dependency>
+  	<groupId>org.mybatis.caches</groupId>
+      <artifactId>mybatis-redis</artifactId>
+      <version>1.0.0-beta2</version>
+  </dependency>
+  ```
+
+* redis配置文件
+
+  ![image-20210220230322289](mybatis.assets/image-20210220230322289.png)
+
+* 注解或xml声明使用RedisCache实现二级缓存
+
+  ![image-20210220230410713](mybatis.assets/image-20210220230410713.png)
+
+  ![image-20210220230432649](mybatis.assets/image-20210220230432649.png)
