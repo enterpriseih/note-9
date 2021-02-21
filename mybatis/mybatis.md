@@ -23,6 +23,12 @@ MyBatis核心配置文件，约定俗成命名为sqlMappConfig.xml。主要用�
         <!--<typeAlias type="com.lagou.pojo.User" alias="user"/>-->
         <package name="com.lagou.pojo"/>
     </typeAliases>
+    <plugins>
+        <plugin interceptor="com.lagou.plugin.MyPlugin">
+            <!--配置参数-->
+            <property name="name" value="ying"/>
+        </plugin>
+    </plugins>
     <environments default="development">
         <environment id="development">
             <transactionManager type="JDBC"/>
@@ -81,6 +87,8 @@ MyBatis核心配置文件，约定俗成命名为sqlMappConfig.xml。主要用�
     | arraylist  | Arraylist  |
     | collection | Collection |
     | iterator   | Iterator   |
+
+* plugins  插件配置
 
 * environments  数据库环境信息，可配置多个，default为默认环境名称
 
@@ -379,3 +387,130 @@ CachingExecutor 从内存中获取数据， 在查找数据库前先查找缓存
   ![image-20210220230410713](mybatis.assets/image-20210220230410713.png)
 
   ![image-20210220230432649](mybatis.assets/image-20210220230432649.png)
+
+#### 三、MyBatis插件
+
+##### 1、MyBatis插件原理
+
+* 创建MyBatis四大对象Executor、 StatementHandler、 ParameterHandler、ResultSetHandler时，通过 interceptorChain.pluginAll(parameterHandler) 获取
+
+* 获取到所有的 Interceptor (插件需要实现的接⼝)。调⽤ interceptor.plugin(target)，返回 target 包装后的对象
+
+* 即插件为四⼤对象创建出代理对象，代理对象就可以拦截到四⼤对象的每⼀个执行
+
+##### 2、MyBatis所允许拦截的⽅法
+
+* 执⾏器Executor (update、 query、 commit、 rollback等)
+* SQL语法构建器StatementHandler (prepare、 parameterize、 batch、 updates query等)；
+* 参数处理器ParameterHandler (getParameterObject、 setParameters)
+* 结果集处理器ResultSetHandler (handleResultSets、 handleOutputParameters等)
+
+##### 3、实现自定义插件
+
+* 创建一个自定义插件类，实现 Interceptor 接口
+
+  ```java
+  // mybatis拦截器注解
+  @Intercepts({
+          // 要拦截的四大对象的哪个方法(可配置多个)，因为方法有重载，需要通过参数确定哪个方法
+          @Signature(
+                  type = Executor.class,
+                  method = "query",
+                  args = {MappedStatement.class, Object.class, RowBounds.class, ResultHandler.class}
+          )
+  })
+  public class MyPlugin implements Interceptor {
+  
+      // 增强逻辑
+      @Override
+      public Object intercept(Invocation invocation) throws Throwable {
+          System.out.println("自定义插件增强逻辑");
+          // 调用原方法
+          return invocation.proceed();
+      }
+  
+      // 把这个拦截器⽣成⼀个代理放到拦截器链
+      @Override
+      public Object plugin(Object target) {
+          System.out.println("将要包装的⽬标对象： " + target);
+          return Plugin.wrap(target, this);
+      }
+  
+      // 获取配置⽂件的属性，插件初始化的时候调⽤，也只调⽤⼀次，插件配置的属性从这⾥设置进来
+      @Override
+      public void setProperties(Properties properties) {
+          System.out.println("插件配置的初始化参数： " + properties);
+      }
+  }
+  ```
+
+* sqlMapConfig.xml配置自定义插件
+
+  ```xml
+  <plugins>
+  	<plugin interceptor="com.lagou.plugin.MyPlugin">
+      	<!--配置参数-->
+      	<property name="name" value="ying"/>
+      </plugin>
+  </plugins>
+  ```
+
+##### 4、源码解析
+
+​		在解析 sqlMapConfig.xml ，初始化 configuration 对象时，会将当前配置的 plugin 实例化，读取配置插件参数，放进 interceptorChain 中，等待Executor调用。
+
+![image-20210221235840986](mybatis.assets/image-20210221235840986.png)
+
+​			执行查询的Mapper对象其实就是一个代理对象，真正在起作用的为MapperProxy，然后在执行调用方法时，是调用MapperProxy的invoke方法，然后对于select方法，最终都是调用selectList，selectList经过多层调用后最终还是调用doQuery方法。通过newStatementHandler方法去获取StatementHandler对象。
+
+![image-20210222000954683](mybatis.assets/image-20210222000954683.png)
+
+​		调用了interceptorChain.pluginAll(statementHandler)得到statementHandler对象
+
+![image-20210222001112739](mybatis.assets/image-20210222001112739.png)
+
+![image-20210222001952420](mybatis.assets/image-20210222001952420.png)
+
+​		Plugin 实现了 InvocationHandler 接口，invoke 方法会拦截被代理对象所有方调用
+
+```java
+public class Plugin implements InvocationHandler {
+
+  private final Object target;
+  private final Interceptor interceptor;
+  private final Map<Class<?>, Set<Method>> signatureMap;
+
+  private Plugin(Object target, Interceptor interceptor, Map<Class<?>, Set<Method>> signatureMap) {
+    this.target = target;
+    this.interceptor = interceptor;
+    this.signatureMap = signatureMap;
+  }
+
+  public static Object wrap(Object target, Interceptor interceptor) {
+    Map<Class<?>, Set<Method>> signatureMap = getSignatureMap(interceptor);
+    Class<?> type = target.getClass();
+    Class<?>[] interfaces = getAllInterfaces(type, signatureMap);
+    if (interfaces.length > 0) {
+      return Proxy.newProxyInstance(
+          type.getClassLoader(),
+          interfaces,
+          new Plugin(target, interceptor, signatureMap));
+    }
+    return target;
+  }
+
+  @Override
+  public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+    try {
+      Set<Method> methods = signatureMap.get(method.getDeclaringClass());
+      if (methods != null && methods.contains(method)) {
+        return interceptor.intercept(new Invocation(target, method, args));
+      }
+      return method.invoke(target, args);
+    } catch (Exception e) {
+      throw ExceptionUtil.unwrapThrowable(e);
+    }
+  }
+ ...
+```
+
