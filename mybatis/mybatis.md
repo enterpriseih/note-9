@@ -455,7 +455,7 @@ CachingExecutor 从内存中获取数据， 在查找数据库前先查找缓存
   </plugins>
   ```
 
-##### 4、源码解析
+##### 4、自定插件执行流程源码解析
 
 ​		在解析 sqlMapConfig.xml ，初始化 configuration 对象时，会将当前配置的 plugin 实例化，读取配置插件参数，放进 interceptorChain 中，等待Executor调用。
 
@@ -465,52 +465,114 @@ CachingExecutor 从内存中获取数据， 在查找数据库前先查找缓存
 
 ![image-20210222000954683](mybatis.assets/image-20210222000954683.png)
 
-​		调用了interceptorChain.pluginAll(statementHandler)得到statementHandler对象
+​		调用了interceptorChain.pluginAll(statementHandler)去获取statementHandler对象，里边其实是循环配置的插件，调用自定义插件的 plugin 方法，返回一个代理对象
 
 ![image-20210222001112739](mybatis.assets/image-20210222001112739.png)
 
 ![image-20210222001952420](mybatis.assets/image-20210222001952420.png)
 
-​		Plugin 实现了 InvocationHandler 接口，invoke 方法会拦截被代理对象所有方调用
+​		自定义插件上的注解都在 getSignatureMap 方法中解析，将对应的type、method保存进Map中返回。
 
-```java
-public class Plugin implements InvocationHandler {
+然后在wrap方法中对当前class进行判断，如果是当前class是@Signature中指定的type的子类，则进行代理操作。
 
-  private final Object target;
-  private final Interceptor interceptor;
-  private final Map<Class<?>, Set<Method>> signatureMap;
+![image-20210222204856706](mybatis.assets/image-20210222204856706.png)
 
-  private Plugin(Object target, Interceptor interceptor, Map<Class<?>, Set<Method>> signatureMap) {
-    this.target = target;
-    this.interceptor = interceptor;
-    this.signatureMap = signatureMap;
+​		代理对象最终执行的方法为invoke方法，只有signatureMap取出的methods中包含当前方法名才会调用代理对象的intercept方法，否则直接进行method.invoke操作，不会对方法进行拦截
+
+![image-20210222205227002](mybatis.assets/image-20210222205227002.png)
+
+##### 5、分页插件pageHelp
+
+* pom.xml导入对应依赖
+
+  ```xml
+  <dependency>
+  	<groupId>com.github.pagehelper</groupId>
+      <artifactId>pagehelper</artifactId>
+      <version>3.7.5</version>
+  </dependency>
+  <dependency>
+       <groupId>com.github.jsqlparser</groupId>
+       <artifactId>jsqlparser</artifactId>
+       <version>0.9.1</version>
+  </dependency>
+  ```
+
+* sqlMapperConfig.xml配置 pageHelper 插件，并指定数据库
+
+  ```xml
+  <plugin interceptor="com.github.pagehelper.PageHelper">
+  	<!--指定⽅⾔-->
+      <property name="dialect" value="mysql"/>
+  </plugin>
+  ```
+
+* 测试使用，设置分页，获取分页信息
+
+  ![image-20210222210759921](mybatis.assets/image-20210222210759921.png)
+
+##### 6、通用mapper插件
+
+​		通⽤Mapper就是为了解决单表增删改查，基于Mybatis的插件机制。开发⼈员不需要编写SQL,不需要
+
+在DAO中增加⽅法，只要写好实体类，就能⽀持相应的增删改查⽅法。
+
+* pom.xml 导入通用 mapper 依赖
+
+  ```xml
+  <!--通用mapper-->
+  <dependency>
+  	<groupId>tk.mybatis</groupId>
+      <artifactId>mapper</artifactId>
+      <version>3.1.2</version>
+      </dependency>
+  </dependencies>
+  ```
+
+*  sqlMapperConfig.xml配置通用 mapper 插件，指定使用的通用 mapper 接口
+
+  ```xml
+  <plugin interceptor="tk.mybatis.mapper.mapperhelper.MapperInterceptor">
+  	<!-- 通⽤Mapper接⼝，多个通⽤接⼝⽤逗号隔开 -->
+      <property name="mappers" value="tk.mybatis.mapper.common.Mapper"/>
+  </plugin>
+  ```
+
+* 实体类
+
+  ```java
+  package com.lagou.pojo;
+  
+  import lombok.Data;
+  
+  import javax.persistence.*;
+  
+  @Data
+  @Table(name = "sys_role")  // 数据库表名
+  public class Role {
+  
+      @Id  // 主键
+      @GeneratedValue(strategy = GenerationType.IDENTITY)  // 主键自增方式
+      private Integer id;
+  
+      @Column(name = "rolename")  // 映射的数据库字段
+      private String roleName;
+  
+      @Column(name = "roleDesc")
+      private String roleDesc;
   }
+  ```
 
-  public static Object wrap(Object target, Interceptor interceptor) {
-    Map<Class<?>, Set<Method>> signatureMap = getSignatureMap(interceptor);
-    Class<?> type = target.getClass();
-    Class<?>[] interfaces = getAllInterfaces(type, signatureMap);
-    if (interfaces.length > 0) {
-      return Proxy.newProxyInstance(
-          type.getClassLoader(),
-          interfaces,
-          new Plugin(target, interceptor, signatureMap));
-    }
-    return target;
+* mapper 接口继承通用mapper接口
+
+  ```java
+  package com.lagou.mapper;
+  
+  import com.lagou.pojo.Role;
+  import tk.mybatis.mapper.common.Mapper;
+  
+  public interface IRoleMapper extends Mapper<Role> {
   }
+  ```
 
-  @Override
-  public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
-    try {
-      Set<Method> methods = signatureMap.get(method.getDeclaringClass());
-      if (methods != null && methods.contains(method)) {
-        return interceptor.intercept(new Invocation(target, method, args));
-      }
-      return method.invoke(target, args);
-    } catch (Exception e) {
-      throw ExceptionUtil.unwrapThrowable(e);
-    }
-  }
- ...
-```
-
+![image-20210222221656769](mybatis.assets/image-20210222221656769.png)
