@@ -430,6 +430,307 @@ springmvc.xml配置⽂件上传解析器
 
     
 
+##### 二、自定义MVC框架
+
+![自定义MVC框架](SpringMVC.assets/%E8%87%AA%E5%AE%9A%E4%B9%89MVC%E6%A1%86%E6%9E%B6-1619455812886.png)
+
+##### 三、SSM整合
+
+**1、idea新建一个maven web项目**
+
+![image-20210426232135582](SpringMVC.assets/image-20210426232135582.png)
+
+![image-20210426232254051](SpringMVC.assets/image-20210426232254051.png)
+
+**2、配置pom.xml，引入相关依赖：junit、mybatis、spring、mybatis和spring整合包、数据库驱动、druid连接池、springmvc、jsp和servlet、json数据交互、jstl表达式、tomcat插件**
+
+```xml
+    <dependencies>
+        <!--junit-->
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>4.12</version>
+            <scope>test</scope>
+        </dependency>
+        <!--mybatis-->
+        <dependency>
+            <groupId>org.mybatis</groupId>
+            <artifactId>mybatis</artifactId>
+            <version>3.4.5</version>
+        </dependency>
+        <!--spring相关-->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-context</artifactId>
+            <version>5.1.12.RELEASE</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-test</artifactId>
+            <version>5.1.12.RELEASE</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-jdbc</artifactId>
+            <version>5.1.12.RELEASE</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-tx</artifactId>
+            <version>5.1.12.RELEASE</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-aop</artifactId>
+            <version>5.1.12.RELEASE</version>
+        </dependency>
+        <dependency>
+            <groupId>org.aspectj</groupId>
+            <artifactId>aspectjweaver</artifactId>
+            <version>1.8.9</version>
+        </dependency>
+        <!--mybatis与spring的整合包-->
+        <dependency>
+            <groupId>org.mybatis</groupId>
+            <artifactId>mybatis-spring</artifactId>
+            <version>2.0.3</version>
+        </dependency>
+        <!--数据库驱动jar-->
+        <dependency>
+            <groupId>mysql</groupId>
+            <artifactId>mysql-connector-java</artifactId>
+            <version>5.1.46</version>
+        </dependency>
+        <!--druid连接池-->
+        <dependency>
+            <groupId>com.alibaba</groupId>
+            <artifactId>druid</artifactId>
+            <version>1.1.21</version>
+        </dependency>
+        <!--SpringMVC-->
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-webmvc</artifactId>
+            <version>5.1.12.RELEASE</version>
+        </dependency>
+        <!--jsp-api&servlet-api-->
+        <dependency>
+            <groupId>javax.servlet</groupId>
+            <artifactId>jsp-api</artifactId>
+            <version>2.0</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>javax.servlet</groupId>
+            <artifactId>javax.servlet-api</artifactId>
+            <version>3.1.0</version>
+            <scope>provided</scope>
+        </dependency>
+        <!--⻚⾯使⽤jstl表达式-->
+        <dependency>
+            <groupId>jstl</groupId>
+            <artifactId>jstl</artifactId>
+            <version>1.2</version>
+        </dependency>
+        <dependency>
+            <groupId>taglibs</groupId>
+            <artifactId>standard</artifactId>
+            <version>1.1.2</version>
+        </dependency>
+        <!--json数据交互所需jar， start-->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-core</artifactId>
+            <version>2.9.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>2.9.0</version>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+            <version>2.9.0</version>
+        </dependency>
+        <!--json数据交互所需jar， end-->
+    </dependencies>
+
+    <build>
+        <plugins>
+            <!--tomcat插件-->
+            <plugin>
+                <groupId>org.apache.tomcat.maven</groupId>
+                <artifactId>tomcat7-maven-plugin</artifactId>
+                <version>2.2</version>
+                <configuration>
+                    <port>8080</port>
+                    <path>/</path>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+```
+
+**3、demo代码**
+
+![image-20210427000035007](SpringMVC.assets/image-20210427000035007.png)
+
+**4、配置文件：数据库连接信息 jdbc.properties、spring配置文件（dao层和service分开配置） applicationContext-dao.xml，applicationContext-service.xml、springmvc配置文件 springmvc.xml**
+
+* jdbc.properties
+
+  ```properties
+  jdbc.driver=com.mysql.jdbc.Driver
+  jdbc.url=jdbc:mysql://localhost:3306/lagou
+  jdbc.username=root
+  jdbc.password=root
+  ```
+
+* applicationContext-dao.xml 配置dao层包扫描，引⼊外部资源⽂件jdbc.properties，bean配置dataSource、sqlSessionFactory、MapperScannerConfigurer（Mapper动态代理对象交给Spring管理）
+
+  ```xml
+  <?xml version="1.0" encoding="UTF-8"?>
+  <beans xmlns="http://www.springframework.org/schema/beans"
+         xmlns:context="http://www.springframework.org/schema/context"
+         xmlns:tx="http://www.springframework.org/schema/tx"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="
+         http://www.springframework.org/schema/beans
+         http://www.springframework.org/schema/beans/spring-beans.xsd
+         http://www.springframework.org/schema/context
+         http://www.springframework.org/schema/context/spring-context.xsd
+         http://www.springframework.org/schema/tx
+         http://www.springframework.org/schema/tx/spring-tx.xsd
+  ">
+      <!--包扫描-->
+      <context:component-scan base-package="com.lagou.edu.mapper"/>
+  
+      <!--引⼊外部资源⽂件-->
+      <context:property-placeholder location="classpath:jdbc.properties"/>
+  
+      <!--第三⽅jar中的bean定义在xml中-->
+      <bean id="dataSource" class="com.alibaba.druid.pool.DruidDataSource">
+          <property name="driverClassName" value="${jdbc.driver}"/>
+          <property name="url" value="${jdbc.url}"/>
+          <property name="username" value="${jdbc.username}"/>
+          <property name="password" value="${jdbc.password}"/>
+      </bean>
+  
+      <!--SqlSessionFactory对象应该放到Spring容器中作为单例对象管理
+      原来mybaits中sqlSessionFactory的构建是需要素材的： SqlMapConfig.xml中的内容 -->
+      <bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+          <!--别名映射扫描-->
+          <property name="typeAliasesPackage" value="com.lagou.edu.pojo"/>
+          <!--数据源dataSource-->
+          <property name="dataSource" ref="dataSource"/>
+      </bean>
+  
+      <!--Mapper动态代理对象交给Spring管理，我们从Spring容器中直接获得Mapper的代理对象-->
+      <!--扫描mapper接⼝，⽣成代理对象，⽣成的代理对象会存储在ioc容器中-->
+      <bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+          <!--mapper接⼝包路径配置-->
+          <property name="basePackage" value="com.lagou.edu.mapper"/>
+          <property name="sqlSessionFactoryBeanName" value="sqlSessionFactory"/>
+      </bean>
+  </beans>
+  ```
+
+  
+
+* applicationContext-service.xml 配置service包扫描，事务管理bean，事务管理注解驱动
+
+  ```xml
+  <?xml version="1.0" encoding="UTF-8"?>
+  <beans xmlns="http://www.springframework.org/schema/beans"
+         xmlns:context="http://www.springframework.org/schema/context"
+         xmlns:tx="http://www.springframework.org/schema/tx"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="
+         http://www.springframework.org/schema/beans
+         http://www.springframework.org/schema/beans/spring-beans.xsd
+         http://www.springframework.org/schema/context
+         http://www.springframework.org/schema/context/spring-context.xsd
+         http://www.springframework.org/schema/tx
+         http://www.springframework.org/schema/tx/spring-tx.xsd
+  ">
+      <!--包扫描-->
+      <context:component-scan base-package="com.lagou.edu.service"/>
+      <!--事务管理-->
+      <bean id="transactionManager"
+            class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+          <property name="dataSource" ref="dataSource"/>
+      </bean>
+  
+      <!--事务管理注解驱动-->
+      <tx:annotation-driven transaction-manager="transactionManager"/>
+  </beans>
+  ```
+
+* springmvc.xml
+
+* ```xml
+  <?xml version="1.0" encoding="UTF-8"?>
+  <beans xmlns="http://www.springframework.org/schema/beans"
+         xmlns:context="http://www.springframework.org/schema/context"
+         xmlns:mvc="http://www.springframework.org/schema/mvc"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://www.springframework.org/schema/beans
+         http://www.springframework.org/schema/beans/spring-beans.xsd
+         http://www.springframework.org/schema/context
+         http://www.springframework.org/schema/context/spring-context.xsd
+         http://www.springframework.org/schema/mvc
+         http://www.springframework.org/schema/mvc/spring-mvc.xsd
+  ">
+      <!--扫描controller-->
+      <context:component-scan base-package="com.lagou.edu.controller"/>
+      <!--注册默认处理请求，参数和返回值的类-->
+      <mvc:annotation-driven/>
+  </beans>
+  ```
+
+* web.xml 配置自动加载配置，spring，springmvc启动
+
+  ```xml
+  <!DOCTYPE web-app PUBLIC
+          "-//Sun Microsystems, Inc.//DTD Web Application 2.3//EN"
+          "http://java.sun.com/dtd/web-app_2_3.dtd" >
+  
+  <web-app>
+      <display-name>Archetype Created Web Application</display-name>
+  
+      <context-param>
+          <param-name>contextConfigLocation</param-name>
+          <param-value>classpath*:applicationContext*.xml</param-value>
+      </context-param>
+      <!--spring框架启动-->
+      <listener>
+          <listener-class>org.springframework.web.context.ContextLoaderListener</listener-class>
+      </listener>
+  
+      <!--springmvc启动-->
+      <servlet>
+          <servlet-name>springmvc</servlet-name>
+          <servlet-class>org.springframework.web.servlet.DispatcherServlet</servlet-class>
+          <init-param>
+              <param-name>contextConfigLocation</param-name>
+              <param-value>classpath*:springmvc.xml</param-value>
+          </init-param>
+          <load-on-startup>1</load-on-startup>
+      </servlet>
+  
+  
+      <servlet-mapping>
+          <servlet-name>springmvc</servlet-name>
+          <url-pattern>/</url-pattern>
+      </servlet-mapping>
+  </web-app>
+  
+  ```
+
+  
+
 
 
 ##### Spring MVC 注解
