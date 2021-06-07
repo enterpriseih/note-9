@@ -258,6 +258,155 @@ logging.file.path=spring.log
 
 
 
+#### 二、SpringBoot 源码
+
+##### 1、SpringBoot 源码构建
+
+###### 1.1 环境
+
+* JDK 1.8+
+* Maven 3.5+
+
+###### 1.2 下载源码
+
+https://github.com/spring-projects/spring-boot/releases  （当前使用spring-boot-2.2.9.RELEASE）
+
+###### 1.3 编译源码
+
+* 进⼊spring-boot源码根⽬录
+* 执⾏mvn命令: mvn clean install -DskipTests -Pfast
+
+###### 1.4 IDEA 打开工程
+
+![image-20210518225730510](SpringBoot.assets/image-20210518225730510.png)
+
+disable.checks 报红处理
+
+```xml
+<properties>
+	<revision>2.2.9.RELEASE</revision>
+	<main.basedir>${basedir}</main.basedir>
+	<disable.checks>true</disable.checks>
+</properties>
+```
+
+###### 1.5 新建一个module
+
+![image-20210518230014825](SpringBoot.assets/image-20210518230014825.png)
+
+Springboot 依赖版本要注意和下载的一样
+
+![image-20210518230124593](SpringBoot.assets/image-20210518230124593.png)
+
+建好测试类
+
+![image-20210518230208377](SpringBoot.assets/image-20210518230208377.png)
+
+
+
+##### 2、SpringBoot 自动配置原理
+
+##### 3、SpringBoot run 方法执行流程
+
+###### 3.1 run 方法执行流程及作用
+
+![image-20210523202015106](SpringBoot.assets/image-20210523202015106.png)
+
+![image-20210523202430807](SpringBoot.assets/image-20210523202430807.png)
+
+![image-20210523202449025](SpringBoot.assets/image-20210523202449025.png)
+
+![image-20210523202520369](SpringBoot.assets/image-20210523202520369.png)
+
+run 方法执行的六个步骤
+
+1. **获取并启动监听器**
+2. **构造应用上下文环境**
+3. **初始化应用上下文**
+4. **刷新应用上下文前的准备阶段**
+5. **刷新应用上下文**
+6. **刷新应用上下文后的扩展接口**
+
+```java
+	public ConfigurableApplicationContext run(String... args) {
+		//记录程序运行时间
+		StopWatch stopWatch = new StopWatch();
+		stopWatch.start();
+		// ConfigurableApplicationContext Spring 的上下文
+		ConfigurableApplicationContext context = null;
+		Collection<SpringBootExceptionReporter> exceptionReporters = new ArrayList<>();
+		configureHeadlessProperty();
+		//【1、获取并启动监听器】
+		SpringApplicationRunListeners listeners = getRunListeners(args);
+        // 启动监听器
+		listeners.starting();
+		try {
+			ApplicationArguments applicationArguments = new DefaultApplicationArguments(args);
+			//【2、构造应用上下文环境】
+			ConfigurableEnvironment environment = prepareEnvironment(listeners, applicationArguments);
+			//处理需要忽略的Bean
+			configureIgnoreBeanInfo(environment);
+			//打印banner
+			Banner printedBanner = printBanner(environment);
+			///【3、初始化应用上下文】
+			context = createApplicationContext();
+			//实例化SpringBootExceptionReporter.class，用来支持报告关于启动的错误
+			exceptionReporters = getSpringFactoriesInstances(SpringBootExceptionReporter.class,
+					new Class[] { ConfigurableApplicationContext.class }, context);
+			//【4、刷新应用上下文前的准备阶段】
+			prepareContext(context, environment, listeners, applicationArguments, printedBanner);
+			//【5、刷新应用上下文】
+			refreshContext(context);
+			//【6、刷新应用上下文后的扩展接口】
+			afterRefresh(context, applicationArguments);
+			//时间记录停止
+			stopWatch.stop();
+			if (this.logStartupInfo) {
+				new StartupInfoLogger(this.mainApplicationClass).logStarted(getApplicationLog(), stopWatch);
+			}
+			//发布容器启动完成事件
+			listeners.started(context);
+			callRunners(context, applicationArguments);
+		}
+		catch (Throwable ex) {
+			handleRunFailure(context, ex, exceptionReporters, listeners);
+			throw new IllegalStateException(ex);
+		}
+
+		try {
+			listeners.running(context);
+		}
+		catch (Throwable ex) {
+			handleRunFailure(context, ex, exceptionReporters, null);
+			throw new IllegalStateException(ex);
+		}
+		return context;
+	}
+```
+
+
+
+##### 4、自定义 Start
+
+###### 4.1 SpringBoot Start 机制
+
+​		SpringBoot中的starter是一种非常重要的机制，能够抛弃以前繁杂的配置，将其统一集成进starter，应用者只需要在maven中引入starter依赖，SpringBoot就能自动扫描到要加载的信息并启动相应的默认配置。Starter让我们摆脱了各种依赖库的处理，需要配置各种信息的困扰。
+​		SpringBoot会自动通过classpath路径下的类发现需要的Bean，并注册进IOC容器。SpringBoot提供了针对日常企业应用研发各种场景的spring-boot-starter依赖模块。所有这些依赖模块都遵循着约定成俗的默认配置，并允许我们调整这些配置，即遵循“约定大于配置”的理念。  
+
+###### 4.2 自定义starter的命名规则
+
+​		SpringBoot提供的starter以 spring-boot-starter-xxx 的方式命名的。
+
+​		官方建议自定义的starter使用 xxx-spring-boot-starter 命名规则。以区分SpringBoot生态提供的starter。
+
+
+
+
+
+
+
+
+
 
 
 #### 注解
