@@ -399,11 +399,155 @@ run 方法执行的六个步骤
 
 ​		官方建议自定义的starter使用 xxx-spring-boot-starter 命名规则。以区分SpringBoot生态提供的starter。
 
+###### 4.3 自定义starter代码实现
 
+* 新建 maven jar 工程，工程名为 zdy-spring-boot-starter，导入依赖：
 
+  ```xml
+  <dependencies>
+  	<dependency>
+  		<groupId>org.springframework.boot</groupId>
+  		<artifactId>spring-boot-autoconfigure</artifactId>
+  		<version>2.2.9.RELEASE</version>
+  	</dependency>
+  </dependencies>
+  ```
 
+* 编写 JavaBean
 
+  ```java
+  package com.lagou.pojo;
+  
+  import lombok.Data;
+  import org.springframework.boot.context.properties.ConfigurationProperties;
+  import org.springframework.boot.context.properties.EnableConfigurationProperties;
+  
+  @Data
+  @EnableConfigurationProperties
+  @ConfigurationProperties(prefix = "simplebean")
+  public class SimpleBean {
+  
+  	private int id;
+  	private String name;
+  }
+  
+  ```
 
+* 编写配置类 MyAutoConfiguration
+
+  ```java
+  package com.lagou.config;
+  
+  import com.lagou.pojo.SimpleBean;
+  import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+  import org.springframework.context.annotation.Bean;
+  import org.springframework.context.annotation.Configuration;
+  
+  @Configuration
+  public class MyAutoConfiguration {
+  
+  	static {
+  		System.out.println("MyAutoConfiguration init.... ");
+  	}
+  
+  	@Bean
+  	public SimpleBean simpleBean(){
+  		return new SimpleBean();
+  	}
+  
+  }
+  
+  ```
+
+* resources下创建/META-INF/spring.factories ，配置编写的自动配置类
+
+  ![image-20210608011912085](SpringBoot.assets/image-20210608011912085.png)
+
+  ```properties
+  org.springframework.boot.autoconfigure.EnableAutoConfiguration=\
+  com.lagou.config.MyAutoConfiguration
+  ```
+
+* 使用自定义 starter，导入自定义 starter 依赖，在全局配置文件中配置属性值
+
+  ```xml
+  <dependency>
+  	<groupId>com.lagou</groupId>
+  	<artifactId>zdy-spring-boot-starter</artifactId>
+  	<version>1.0-SNAPSHOT</version>
+  </dependency>
+  ```
+
+  ```properties
+  simplebean.id=1
+  simplebean.name=zhangsan
+  ```
+
+###### 4.4 热插拔技术
+
+<img src="SpringBoot.assets/image-20210608012345053.png" alt="image-20210608012345053" style="zoom:50%;" />
+
+​		@Enablexxx注解就是一种热拔插技术，加了这个注解就可以启动对应的starter，当不需要对应的starter的时候只需要把这个注解注释掉就行。
+
+​		改造自定义 starter 工程支持热插拔
+
+* 新增标记类ConfigMarker
+
+  ```java
+  package com.lagou.config;
+  
+  public class ConfigMarker {
+  }
+  ```
+
+* 新增 EnableRegisterServer  注解
+
+  ```java
+  package com.lagou.config;
+  
+  
+  import org.springframework.context.annotation.Import;
+  
+  import java.lang.annotation.ElementType;
+  import java.lang.annotation.Retention;
+  import java.lang.annotation.RetentionPolicy;
+  import java.lang.annotation.Target;
+  
+  @Target(ElementType.TYPE)
+  @Retention(RetentionPolicy.RUNTIME)
+  @Import(ConfigMarker.class)
+  public @interface EnableRegisterServer {
+  }
+  ```
+
+* 改造 MyAutoConfiguration 新增条件注解 @ConditionalOnBean(ConfigMarker.class) ，
+  @ConditionalOnBean 这个是条件注解，前面的意思代表只有当期上下文中含有 ConfigMarker对象，被标注的类才会被实例化 
+
+  ```java
+  package com.lagou.config;
+  
+  import com.lagou.pojo.SimpleBean;
+  import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+  import org.springframework.context.annotation.Bean;
+  import org.springframework.context.annotation.Configuration;
+  
+  @Configuration
+  @ConditionalOnBean(ConfigMarker.class)
+  public class MyAutoConfiguration {
+  
+  	static {
+  		System.out.println("MyAutoConfiguration init.... ");
+  	}
+  
+  	@Bean
+  	public SimpleBean simpleBean(){
+  		return new SimpleBean();
+  	}
+  
+  }
+  ```
+
+  
 
 
 
