@@ -547,7 +547,80 @@ run 方法执行的六个步骤
   }
   ```
 
-  
+##### 5、内嵌tomcat原理
+
+SpringBoot支持Tomcat，Jetty，Undertow作为底层容器。
+SpringBoot默认使用Tomcat，一旦引入spring-boot-starter-web模块，就默认使用Tomcat容器。
+
+spring-boot-starter-web核心就是引入了tomcat和SpringMVC。
+
+###### 5.1 切换servlet容器
+
+* 将tomcat依赖移除
+* 引入其他Servlet容器依赖
+
+```xml
+<dependency>
+	<groupId>org.springframework.boot</groupId>
+	<artifactId>spring-boot-starter-web</artifactId>
+	<exclusions>
+        <exclusion>
+        <!--移除spring-boot-starter-web中的tomcat-->
+		<artifactId>spring-boot-starter-tomcat</artifactId>
+		<groupId>org.springframework.boot</groupId>
+		<exclusion>
+     </exclusions>
+</dependency>
+<dependency>
+	<groupId>org.springframework.boot</groupId>
+	<!--引入jetty-->
+	<artifactId>spring-boot-starter-jetty</artifactId>
+</dependency>
+```
+
+###### 5.2 内嵌 tomcat 源码
+
+**进入 SpringBoot 启动类 @SpringBootApplication**
+
+![image-20210609003501644](SpringBoot.assets/image-20210609003501644.png)
+
+**找到自动配置注解 @EnableAutoConfiguration** 
+
+![image-20210609003635626](SpringBoot.assets/image-20210609003635626.png)
+
+**@EnableAutoConfiguration 注解对 AutoConfigurationImportSelector 进行了引入**
+
+![image-20210609003744460](SpringBoot.assets/image-20210609003744460.png)
+
+**首先调用 selectImport() 方法，在该方法中调用了 getAutoConfigurationEntry() 方法，在之中又调用了getCandidateConfigurations() 方法，getCandidateConfigurations() 方法就去 META-INF/spring.factory 配置文件中加载相关配置类**
+
+![image-20210609004334480](SpringBoot.assets/image-20210609004334480.png)
+
+![image-20210609004513058](SpringBoot.assets/image-20210609004513058.png)
+
+![image-20210609004554458](SpringBoot.assets/image-20210609004554458.png)
+
+**tomcat 加载在 ServletWebServerFactoryAutoConfiguration 配置类中**  
+
+![image-20210609004945404](SpringBoot.assets/image-20210609004945404.png)
+
+**通过@Import注解将EmbeddedTomcat、EmbeddedJetty、EmbeddedUndertow等嵌入式容器类加载进来了**  
+
+![image-20210609005902421](SpringBoot.assets/image-20210609005902421.png)
+
+**EmbeddedTomcat 中实例化了 tomcat 工厂类**
+
+![image-20210609010031183](SpringBoot.assets/image-20210609010031183.png)
+
+**在 TomcatServletWebServerFactory 的 getWebServer() 方法中，实例化了一个 tomcat，设置了 tomcat 相关信息**
+
+![image-20210609010156844](SpringBoot.assets/image-20210609010156844.png)
+
+**一直进入 getTomcatWebServer() 方法，最终在 initialize() 方法中启动了 tomcat**
+
+![image-20210609010614426](SpringBoot.assets/image-20210609010614426.png)
+
+5.3 getWebServer() 的调用分析   
 
 
 
