@@ -657,6 +657,42 @@ org.springframework.boot.autoconfigure.web.servlet.DispatcherServletAutoConfigur
 
 ![image-20210614162516870](SpringBoot.assets/image-20210614162516870.png)
 
+DispatcherServletAutoConfiguration主要包含两个内部类DispatcherServletConfiguration 和DispatcherServletRegistrationConfiguration 。
+
+![image-20210616005457790](SpringBoot.assets/image-20210616005457790.png)
+
+![image-20210616005412719](SpringBoot.assets/image-20210616005412719.png)
+
+​		前者是配置DispatcherServlet，后者是配置DispatcherServlet的注册类。什么是注册类？我们知道Servlet实例是要被添加（注册）到如tomcat这样的ServletContext里的，这样才能够提供请求服务。所以，DispatcherServletRegistrationConfiguration将生成一个Bean，负责将
+DispatcherServlet给注册到ServletContext中 。
+
+**DispatcherServletConfiguration**这个内部类
+
+​		@Conditional指明了一个前置条件判断，由DefaultDispatcherServletCondition实现。主要是判
+断了是否已经存在DispatcherServlet，如果没有才会触发解析。
+​		@ConditionalOnClass指明了当ServletRegistration这个类存在的时候才会触发解析，生成的
+DispatcherServlet才能注册到ServletContext中。
+​		最后，@EnableConfigrationProperties将会从application.properties这样的配置文件中读取
+spring.http和spring.mvc前缀的属性生成配置对象HttpProperties和WebMvcProperties 。
+
+​		dispatcherServlet方法将生成一个DispatcherServlet的Bean对象。比较简单，就是获取一个实
+例，然后添加一些属性设置。
+​		multipartResolver方法主要是把你配置的MultipartResolver的Bean给重命名一下，防止你不是用
+multipartResolver这个名字作为Bean的名字。
+
+**DispatcherServletRegistrationConfiguration**这个内部类
+
+​		@Conditional有一个前置判断，DispatcherServletRegistrationCondition主要判断了该注册类的Bean是否存在。
+​		@ConditionOnClass也判断了ServletRegistration是否存在。
+​		@EnableConfigurationProperties生成了WebMvcProperties的属性对象。
+​		@Import导入了DispatcherServletConfiguration，也就是我们上面的配置对象。   
+
+​		只有一个方法DispatcherServletRegistrationBean，生成了DispatcherServletRegistrationBean。核心逻辑就是实例化了一个
+
+Bean，设置了一些参数，如dispatcherServlet、loadOnStartup等  
+
+
+
 
 
 #### 注解
