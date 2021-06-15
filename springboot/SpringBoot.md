@@ -620,9 +620,42 @@ spring-boot-starter-web核心就是引入了tomcat和SpringMVC。
 
 ![image-20210609010614426](SpringBoot.assets/image-20210609010614426.png)
 
-5.3 getWebServer() 的调用分析   
+###### 5.3 getWebServer() 的调用分析  
 
 
+
+##### 6、自动配置SpringMVC功能
+
+​		普遍 web 项目使用 SpringMVC 需要配置 web.xml ，配置对应的DispatcherServlet 。
+
+ ```xml
+<servlet>
+	<description>spring mvc servlet</description>
+	<servlet-name>springMvc</servlet-name>
+	<servletclass>org.springframework.web.servlet.DispatcherServlet</servlet-class>
+	<load-on-startup>1</load-on-startup>
+</servlet>
+<servlet-mapping>
+	<servlet-name>springMvc</servlet-name>
+	<url-pattern>*.do</url-pattern>
+</servlet-mapping>
+ ```
+
+​		在 Servlet3.0 规范中，要添加一个Servlet，处理采用xml配置的方式，还可以通过代码添加
+
+```java
+servletContext.addServlet(name, this.servlet);
+```
+
+###### 6.1 自动配置DispatcherServlet和DispatcherServletRegistry
+
+SpringMVC 自动配置类
+
+  ```java
+org.springframework.boot.autoconfigure.web.servlet.DispatcherServletAutoConfiguration
+  ```
+
+![image-20210614162516870](SpringBoot.assets/image-20210614162516870.png)
 
 
 
