@@ -687,9 +687,25 @@ multipartResolver这个名字作为Bean的名字。
 ​		@EnableConfigurationProperties生成了WebMvcProperties的属性对象。
 ​		@Import导入了DispatcherServletConfiguration，也就是我们上面的配置对象。   
 
-​		只有一个方法DispatcherServletRegistrationBean，生成了DispatcherServletRegistrationBean。核心逻辑就是实例化了一个
+​		只有一个方法DispatcherServletRegistrationBean，生成了DispatcherServletRegistrationBean。核心逻辑就是实例化了一个Bean，设置了一些参数，如dispatcherServlet、loadOnStartup等。 
 
-Bean，设置了一些参数，如dispatcherServlet、loadOnStartup等  
+
+
+###### 6.2 注册DispatcherServlet到ServletContext
+
+​		看到了DispatcherServlet和DispatcherServletRegistrationBean这两个Bean的自动配置。DispatcherServlet我们很熟悉，DispatcherServletRegistrationBean负责将DispatcherServlet注册到ServletContext当中。
+
+DispatcherServletRegistrationBean 类图
+
+![image-20210616204111334](SpringBoot.assets/image-20210616204111334.png) 
+
+从ServletContextInitializer接口一直往下查看，这里直接将DispatcherServlet给add到了servletContext当中 。
+
+![image-20210616204445339](SpringBoot.assets/image-20210616204445339.png)
+
+SpringBoot 启动时依次去调用对象的 onStartup 方法，就是会调用到DispatcherServletRegistrationBean 的 onStartup 方法，这个类并没有这个方法，所以最终会调用到父类 RegistrationBean 的 onStartup 方法
+
+![image-20210616205606625](SpringBoot.assets/image-20210616205606625.png)
 
 
 
