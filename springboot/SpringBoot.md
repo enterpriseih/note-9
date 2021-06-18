@@ -709,6 +709,109 @@ SpringBoot 启动时依次去调用对象的 onStartup 方法，就是会调用�
 
 
 
+#### 三、SpringBoot数据源及连接池配置
+
+##### 1、数据源配置
+
+###### 1.1 maven配置MySql数据库驱动
+
+```xml
+<dependency>
+	<groupId>mysql</groupId>
+	<artifactId>mysql-connector-java</artifactId>
+	<scope>runtime</scope>
+</dependency>
+```
+
+###### 1.2 数据库连接配置
+
+```properties
+spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
+spring.datasource.url=jdbc:mysql://localhost:3306/lagou?useUnicode=true&characterEncoding=utf-8&useSSL=true&serverTimezone=UTC
+spring.datasource.username=root
+spring.datasource.password=root
+```
+
+###### 1.3、配置spring-boot-starter-jdbc  
+
+```xml
+<dependency>
+	<groupId>org.springframework.boot</groupId>
+	<artifactId>spring-boot-starter-jdbc</artifactId>
+</dependency>
+```
+
+###### 1.4 测试
+
+![image-20210617204417456](SpringBoot.assets/image-20210617204417456.png)
+
+
+
+##### 2、连接池配置方式
+
+###### 2.1 SpringBoot 默认提供了三种数据库连接方式
+
+* HikariCP
+
+* Commons DBCP2
+
+* Tomcat JDBC Connection Pool
+
+  
+
+###### 2.2 spring boot2.x版本默认使用HikariCP
+
+maven配置
+
+```xml
+<dependency>
+	<groupId>org.springframework.boot</groupId>
+	<artifactId>spring-boot-starter-jdbc</artifactId>
+</dependency>
+```
+
+改用 Commons DBCP2 ，maven配置
+
+```xml
+<dependency>
+	<groupId>org.apache.commons</groupId>
+	<artifactId>commons-dbcp2</artifactId>
+</dependency>
+<dependency>
+	<groupId>org.springframework.boot</groupId>
+	<artifactId>spring-boot-starter-jdbc</artifactId>
+	<exclusions>
+		<exclusion>
+			<groupId>com.zaxxer</groupId>
+			<artifactId>HikariCP</artifactId>
+		</exclusion>
+	</exclusions>
+</dependency>
+```
+
+SpringBoot哪里配置默认使用HikariCP
+
+![image-20210617204951113](SpringBoot.assets/image-20210617204951113.png)
+
+![image-20210617205007884](SpringBoot.assets/image-20210617205007884.png)
+
+
+
+##### 3、数据源自动配置
+
+/spring-boot-2.2.9.RELEASE/spring-boot-project/spring-boot-autoconfigure/src/main/resources/META-INF/spring.factories 中找到
+
+```xml
+org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration,\
+```
+
+![image-20210617221831673](SpringBoot.assets/image-20210617221831673.png)
+
+查看注解@Conditional(PooledDataSourceCondition.class)，根据判断条件，实例化这个类，指定了配置文
+件中，必须有type这个属性
+
+![image-20210617222133911](SpringBoot.assets/image-20210617222133911.png)
+
 
 
 #### 注解
