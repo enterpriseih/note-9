@@ -797,7 +797,7 @@ SpringBoot哪里配置默认使用HikariCP
 
 
 
-##### 3、数据源自动配置
+##### 3、数据源自动配置原理
 
 /spring-boot-2.2.9.RELEASE/spring-boot-project/spring-boot-autoconfigure/src/main/resources/META-INF/spring.factories 中找到
 
@@ -811,6 +811,133 @@ org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration,\
 件中，必须有type这个属性
 
 ![image-20210617222133911](SpringBoot.assets/image-20210617222133911.png)
+
+```properties
+spring.datasource.type=com.zaxxer.hikari.HikariDataSource
+```
+
+spring.datasource.type作用是设置当前连接池类型
+
+如果要改默认连接池，需要导入对应jar包，并且更改spring.datasource.type。
+
+
+
+##### 4、配置Druid连接池
+
+###### 4.1 引入对应 Maven 依赖
+
+```xml
+<dependency>
+	<groupId>com.alibaba</groupId>
+	<artifactId>druid-spring-boot-starter</artifactId>
+	<version>1.1.10</version>
+</dependency>
+```
+
+###### 4.2 配置文件配置 Druid
+
+​		这边使用的是application.yml，也可以在application.properties配置
+
+```yaml
+spring:
+  datasource:
+    username: root
+    password: root
+    url: jdbc:mysql:///springboot_h?useUnicode=true&characterEncoding=utf-8&useSSL=true&serverTimezone=UTC
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    initialization-mode: always
+    # 使用druid数据源
+    type: com.alibaba.druid.pool.DruidDataSource
+    # 数据源其他配置
+    # 初始化连接数，设为0表示无限制
+    initialSize: 5
+    # 最小的空闲连接
+    minIdle: 5
+    # 最大连接数
+    maxActive: 20
+    # 最大建立连接等待时间。如果超过此时间将接到异常。设为-1表示无限制
+    maxWait: 60000
+    # 检查空闲连接的频率，单位毫秒, 非正整数时表示不进行检查
+    timeBetweenEvictionRunsMillis: 60000
+    # 池中某个连接的空闲时长达到 N 毫秒后, 连接池在下次检查空闲连接时，将回收该连接,要小于防火墙超时设置net.netfilter.nf_conntrack_tcp_timeout_established的设置
+    minEvictableIdleTimeMillis: 300000
+    # 检查池中的连接是否仍可用的SQL语句，drui会连接到数据库执行该SQL, 如果正常返回，则表示连接可用，否则表示连接不可用
+    validationQuery: SELECT 1 FROM DUAL
+    # 当程序请求连接，池在分配连接时，是否先检查该连接是否有效。(高效)
+    testWhileIdle: true
+    # 程序申请连接时，进行连接有效性检查（低效，影响性能）
+    testOnBorrow: false
+    # 程序返还连接时，进行连接有效性检查（低效，影响性能）
+    testOnReturn: false
+    # 缓存通过以下两个方法发起的SQL:
+    # public PreparedStatement prepareStatement(String sql)
+    # public PreparedStatement prepareStatement(String sql, int resultSetType, int resultSetConcurrency)
+    poolPreparedStatements: true
+    # 配置监控统计拦截的filters，去掉后监控界面sql无法统计，'wall'用于防火墙
+    filters: stat,wall,log4j
+    # 每个连接最多缓存多少个SQL
+    maxPoolPreparedStatementPerConnectionSize: 20
+    # 是否开启Druid的监控统计功能
+    useGlobalDataSourceStat: true
+    connectionProperties: druid.stat.mergeSql=true;druid.stat.slowSqlMillis=500
+```
+
+###### 4.3 编写 druid 配置类 DruidConfig 
+
+​		如果没有 druid 配置类，配置文件里对 druid 的配置就不会生效
+
+```java
+package com.lagou.config;
+
+import com.alibaba.druid.pool.DruidDataSource;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+
+import javax.sql.DataSource;
+
+@Configuration
+public class DruidConfig {
+	
+	@ConfigurationProperties(prefix = "spring.datasource")
+	@Bean
+	public DataSource dataSource(){
+		return  new DruidDataSource();
+	}
+
+}
+```
+
+###### 4.4 引入 slf4j-log4j12 适配器
+
+​		因为 druid 配置里用到了 log4j，而 springBoot2.0 以后使用的日志框架已经不再使用 log4j 了。此时应该引入相应的适配器。
+
+```xml
+<dependency>
+	<groupId>org.slf4j</groupId>
+	<artifactId>slf4j-log4j12</artifactId>
+</dependency>
+```
+
+
+
+##### 5、SpringBoot 整合 MyBatis
+
+导入对应MyBatis包，配置好配置文件
+
+```xml
+<dependency>
+	<groupId>org.mybatis.spring.boot</groupId>
+	<artifactId>mybatis-spring-boot-starter</artifactId>
+	<version>1.3.2</version>
+</dependency>
+```
+
+![image-20210620220811682](SpringBoot.assets/image-20210620220811682.png)
+
+可以在启动类配置mapper包扫描，Spring会把这个包下的类都加入Spring容器，这样mapper接口就不用每个去添加@Mapper注解
+
+![image-20210620220829168](SpringBoot.assets/image-20210620220829168.png)
 
 
 
