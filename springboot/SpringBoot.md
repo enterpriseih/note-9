@@ -941,6 +941,35 @@ public class DruidConfig {
 
 
 
+##### 6、MyBatis 自动配置原理
+
+找到 MyBatis 自动配置类
+
+![image-20210621202651512](SpringBoot.assets/image-20210621202651512.png)
+
+@ConditionalOnMissingBean作用：在没有类的时候调用，创建sqlsessionFactory，sqlsessionfactory最主要的是创建并保存了Configuration类 。
+
+获取SqlSessionFactoryBean的getObject()中的对象注入Spring容器，也就是
+SqlSessionFactory对象，最终调用了MyBatis的初始化流程  
+
+![image-20210621203358747](SpringBoot.assets/image-20210621203358747.png)
+
+![image-20210621204014198](SpringBoot.assets/image-20210621204014198.png)
+
+![image-20210621204041238](SpringBoot.assets/image-20210621204041238.png)
+
+扫描 mapper 接口以及生成代理对象
+
+启动类配置扫描 mapper 接口注解
+
+![image-20210621205417523](SpringBoot.assets/image-20210621205417523.png)
+
+![image-20210621205659500](SpringBoot.assets/image-20210621205659500.png)
+
+MapperScannerRegistrar 实现了 ImportBeanDefinitionRegistrar 接口，重写了 registerBeanDefinitions 方法，在Spring 实例话的时候回去调用改方法
+
+![image-20210621205723644](SpringBoot.assets/image-20210621205723644.png)
+
 #### 注解
 
 ##### 	属性注入常用注解  
