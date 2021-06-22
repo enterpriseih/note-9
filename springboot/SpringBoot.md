@@ -984,6 +984,12 @@ processBeanDefinitions 方法里去生成了mapper 代理对象，这边将bean�
 
 
 
+##### 7、SpringBoot + MyBatis 实现动态数据源切换
+
+​		Spring内置了一个AbstractRoutingDataSource，它可以把多个数据源配置成一个Map，然后，根据不同的key返回不同的数据源。因为AbstractRoutingDataSource也是一个DataSource接口，因此，应用程序可以先设置好key， 访问数据库的代码就可以从AbstractRoutingDataSource拿到对应的一个真实的数据源，从而访问指定的数据库。
+
+
+
 #### 注解
 
 ##### 	属性注入常用注解  
