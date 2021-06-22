@@ -966,9 +966,23 @@ SqlSessionFactory对象，最终调用了MyBatis的初始化流程
 
 ![image-20210621205659500](SpringBoot.assets/image-20210621205659500.png)
 
-MapperScannerRegistrar 实现了 ImportBeanDefinitionRegistrar 接口，重写了 registerBeanDefinitions 方法，在Spring 实例话的时候回去调用改方法
+MapperScannerRegistrar 实现了 ImportBeanDefinitionRegistrar 接口，重写了 registerBeanDefinitions 方法，在Spring 实例化的时候回去调用该方法
 
 ![image-20210621205723644](SpringBoot.assets/image-20210621205723644.png)
+
+doScan 方法将包下的类放到Spring 容器中，但此时还未生成代理对象
+
+![image-20210622133004872](SpringBoot.assets/image-20210622133004872.png)
+
+![image-20210622133249343](SpringBoot.assets/image-20210622133249343.png)
+
+processBeanDefinitions 方法里去生成了mapper 代理对象，这边将bean设置成了MapperFactoryBean，而 MapperFactoryBean 实现了FactoryBean接口，当Spring 去遍历到这个bean执行实例化的时候，就会去调用getObject 方法，最终走到了MyBatis的生成代理对象源码
+
+![image-20210622133504720](SpringBoot.assets/image-20210622133504720.png)
+
+![image-20210622133620097](SpringBoot.assets/image-20210622133620097.png)
+
+
 
 #### 注解
 
