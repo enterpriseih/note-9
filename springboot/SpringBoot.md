@@ -988,6 +988,245 @@ processBeanDefinitions 方法里去生成了mapper 代理对象，这边将bean�
 
 ​		Spring内置了一个AbstractRoutingDataSource，它可以把多个数据源配置成一个Map，然后，根据不同的key返回不同的数据源。因为AbstractRoutingDataSource也是一个DataSource接口，因此，应用程序可以先设置好key， 访问数据库的代码就可以从AbstractRoutingDataSource拿到对应的一个真实的数据源，从而访问指定的数据库。
 
+​	具体实现：
+
+###### 7.1 properties 配置对应数据源
+
+```properties
+spring.druid.datasource.master.password=root
+spring.druid.datasource.master.username=root
+spring.druid.datasource.master.jdbc-url=jdbc:mysql://localhost:3306/product_master?useUnicode=true&characterEncoding=utf-8&useSSL=true&serverTimezone=UTC
+spring.druid.datasource.master.driver-class-name=com.mysql.cj.jdbc.Driver
+
+spring.druid.datasource.slave.password=root
+spring.druid.datasource.slave.username=root
+spring.druid.datasource.slave.jdbc-url=jdbc:mysql://localhost:3306/product_slave?useUnicode=true&characterEncoding=utf-8&useSSL=true&serverTimezone=UTC
+spring.druid.datasource.slave.driver-class-name=com.mysql.cj.jdbc.Driver
+```
+
+
+
+###### 7.2 写一个自定义配置类，同时在启动类排除默认数据源自动配置类
+
+```java
+package com.lagou.config;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.jdbc.DataSourceBuilder;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Primary;
+
+import javax.sql.DataSource;
+import java.util.HashMap;
+import java.util.Map;
+
+@Configuration
+public class MyDataSourceAutoConfiguration {
+
+	Logger logger = LoggerFactory.getLogger(MyDataSourceAutoConfiguration.class);
+
+	/**
+	 * master dataSource
+	 */
+	@Bean
+	@ConfigurationProperties(prefix = "spring.druid.datasource.master")
+	public DataSource masterDataSource() {
+		logger.info("create master dataSource...");
+		return DataSourceBuilder.create().build();
+	}
+
+	/**
+	 * slave dataSource
+	 */
+	@Bean
+	@ConfigurationProperties(prefix = "spring.druid.datasource.slave")
+	public DataSource slaveDataSource() {
+		logger.info("create slave dataSource...");
+		return DataSourceBuilder.create().build();
+	}
+
+	@Bean
+	@Primary
+	public DataSource primaryDataSource(
+			@Autowired @Qualifier("masterDataSource") DataSource masterDataSource,
+			@Autowired @Qualifier("slaveDataSource") DataSource slaveDataSource
+	) {
+		RoutingDataSource routingDataSource = new RoutingDataSource();
+		Map<Object, Object> map = new HashMap<>();
+		map.put("master", masterDataSource);
+		map.put("slave", slaveDataSource);
+		routingDataSource.setTargetDataSources(map);
+		return routingDataSource;
+	}
+}
+```
+
+![image-20210623235201899](SpringBoot.assets/image-20210623235201899.png)
+
+
+
+###### 7.3 将数据源 key 存入ThreadLocal中，编写 RoutingDataSource 去实现 AbstractRoutingDataSource
+
+```java
+package com.lagou.config;
+
+public class RoutingDataSourceContext {
+
+	static  final ThreadLocal<String> threadLocal = new ThreadLocal<>();
+
+	// key:指定数据源类型 master slave
+	public RoutingDataSourceContext(String key) {
+		threadLocal.set(key);
+	}
+
+	public static String getDataSourceRoutingKey(){
+		String key = threadLocal.get();
+		return key == null ? "master" : key;
+	}
+
+	public void close(){
+		threadLocal.remove();
+	}
+}
+```
+
+```java
+package com.lagou.config;
+
+import org.springframework.jdbc.datasource.lookup.AbstractRoutingDataSource;
+
+public class RoutingDataSource extends AbstractRoutingDataSource {
+
+	@Override
+	protected Object determineCurrentLookupKey() {
+		return RoutingDataSourceContext.getDataSourceRoutingKey();
+	}
+}
+```
+
+
+
+###### 7.4 写个注解和切面逻辑，在需要切换数据源的地方，根据注解value去获取指定数据源
+
+```java
+package com.lagou.config;
+
+import java.lang.annotation.ElementType;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.annotation.Target;
+
+@Target(ElementType.METHOD)
+@Retention(RetentionPolicy.RUNTIME)
+public @interface RoutingWith {
+
+	String value() default "master";
+}
+```
+
+```java
+package com.lagou.config;
+
+import org.aspectj.lang.ProceedingJoinPoint;
+import org.aspectj.lang.annotation.Around;
+import org.aspectj.lang.annotation.Aspect;
+import org.springframework.stereotype.Component;
+
+@Aspect
+@Component
+public class RoutingAspect {
+
+	@Around("@annotation(with)")
+	public Object routingWithDataSource(ProceedingJoinPoint joinPoint,RoutingWith with) throws Throwable {
+		// master
+		String key = with.value();
+		RoutingDataSourceContext routingDataSourceContext = new RoutingDataSourceContext(key);
+		return  joinPoint.proceed();
+	}
+}
+```
+
+
+
+###### 7.5 对应实体类和 mapper 接口
+
+```java
+package com.lagou.pojo;
+
+import lombok.Data;
+
+@Data
+public class Product {
+	private Integer id;
+	private String name;
+	private Double price;
+}
+```
+
+```java
+package com.lagou.mapper;
+
+import com.lagou.pojo.Product;
+import org.apache.ibatis.annotations.Select;
+
+import java.util.List;
+
+public interface ProductMapper {
+	
+	@Select("select * from product")
+	List<Product> findAllProductM();
+
+	@Select("select * from product")
+	List<Product> findAllProductS();
+}
+
+```
+
+
+
+###### 7.6 controller
+
+```java
+package com.lagou.controller;
+
+
+import com.lagou.config.RoutingWith;
+import com.lagou.service.ProductService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+public class ProductController {
+
+	@Autowired
+	private ProductService productService;
+
+	@RoutingWith("master")
+	@RequestMapping("/findAllProductM")
+	public String findAllProductM(){
+		productService.findAllProductM();
+		return "master";
+	}
+
+	@RoutingWith("slave")
+	@RequestMapping("/findAllProductS")
+	public String findAllProductS(){
+		productService.findAllProductS();
+		return "slave";
+	}
+}
+```
+
+
+
+
+
 
 
 #### 注解
