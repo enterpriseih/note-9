@@ -1225,6 +1225,388 @@ public class ProductController {
 
 
 
+#### 四、SpringBoot 缓存
+
+##### 4.1 JSR107
+
+​		JSR是Java Specification Requests 的缩写 ，Java规范请求，故名思议提交Java规范， JSR-107就是关于如何使用缓存的规范，是java提供的一个接口规范，类似于JDBC规范，没有具体的实现，具体的实现就是reids等这些缓存。 
+
+##### 4.2 JSR107核心接口 
+
+​		Java Caching（JSR-107）定义了5个核心接口，分别是CachingProvider、CacheManager、Cache、Entry和Expiry。
+
+* CachingProvider（缓存提供者）：创建、配置、获取、管理和控制多个CacheManager
+
+* CacheManager（缓存管理器）：创建、配置、获取、管理和控制多个唯一命名的Cache，Cache存在于CacheManager的上下文中。一个CacheManager仅对应一个CachingProvider
+
+* Cache（缓存）：是由CacheManager管理的，CacheManager管理Cache的生命周期，Cache存在于CacheManager的上下文中，是一个类似map的数据结构，并临时存储以key为索引的值。一个Cache仅被一个CacheManager所拥有
+
+* Entry（缓存键值对）：是一个存储在Cache中的key-value对
+
+* Expiry（缓存时效）：每一个存储在Cache中的条目都有一个定义的有效期。一旦超过这个时间，条目就自动过期，过期后，条目将不可以访问、更新和删除操作。缓存有效期可以通过ExpiryPolicy设置 
+
+  ![image-20210712234419563](SpringBoot.assets/image-20210712234419563.png)
+
+使用JSR-107需导入的依赖
+
+```xml
+<dependency>
+	<groupId>javax.cache</groupId>
+	<artifactId>cache-api</artifactId>
+</dependency>
+```
+
+
+
+##### 4.3 Spring 缓存对象
+
+​		Spring从3.1开始定义了org.springframework.cache.Cache和org.springframework.cache.CacheManager接口来统一不同的缓存技术；并支持使用Java Caching（JSR-107）注解简化我们进行缓存开发。  
+
+​		Spring Cache 只负责维护抽象层，具体的实现由自己的技术选型来决定。将缓存处理和缓存技术解除耦合。每次调用需要缓存功能的方法时，Spring会检查指定参数的指定的目标方法是否已经被调用过，如果有就直接从缓存中获取方法调用后的结果，如果没有就调用方法并缓存结果后返回给用户。下次调用直接从缓存中获取。
+  使用Spring缓存抽象时我们需要关注以下两点：
+   ① 确定那些方法需要被缓存
+   ② 缓存策略 
+
+​		Cache：缓存抽象的规范接口，缓存实现有：RedisCache、EhCache、ConcurrentMapCache等
+​		CacheManager：缓存管理器，管理Cache的生命周期 
+
+##### 4.4 Spring 缓存概念和注解
+
+| 概念/注解      | 作用                                                         |
+| -------------- | ------------------------------------------------------------ |
+| Cache          | 缓存接口，定义缓存操作。实现有：RedisCache、EhCacheCache、 ConcurrentMapCache等 |
+| CacheManager   | 缓存管理器，管理各种缓存(Cache)组件                          |
+| @Cacheable     | 主要针对方法配置，能够根据方法的请求参数对其结果进行缓存     |
+| @CacheEvict    | 清空缓存                                                     |
+| @CachePut      | 保证方法被调用，又希望结果被缓存                             |
+| @EnableCaching | 开启基于注解的缓存                                           |
+| keyGenerator   | 缓存数据时key生成策略                                        |
+| serialize      | 缓存数据时value序列化策略                                    |
+
+
+
+##### 4.7 缓存自动配置原理
+
+​		SpringBoot 的自动配置都是 xxxAutoConfiguration，搜索下可以找到 CacheAutoConfiguration。
+
+![image-20210714104829551](SpringBoot.assets/image-20210714104829551.png)
+
+​		CacheAutoConfiguration @Import注解导入了 CacheConfigurationImportSelector，其实就是本身的静态内部类。
+
+![image-20210714105251955](SpringBoot.assets/image-20210714105251955.png)
+
+​		CacheConfigurationImportSelector 中的 selectImports 是给容器添加一些缓存要用的组件。
+
+![image-20210714105419818](SpringBoot.assets/image-20210714105419818.png)
+
+![image-20210714105641665](SpringBoot.assets/image-20210714105641665.png)
+
+​		缓存组件中都有配置要构建这个组件bean所需条件，比如 RedisCacheConfiguration 要再 classpath 下要存在对应的 RedisConnectionFactory class文件才会进行配置。  
+
+![image-20210714105902323](SpringBoot.assets/image-20210714105902323.png)
+
+​		查看所有缓存组件后，默认走的是 SimpleCacheConfiguration。SimpleCacheConfiguration 给容器添加了一个 ConcurrentMapCacheManager bean。
+
+![image-20210714110309100](SpringBoot.assets/image-20210714110309100.png)
+
+​		ConcurrentMapCacheManager 就是操作缓存的具体实现。cacheMap 就是缓存存储所在。getCache 方法就是去获取缓存，缓存不存在则去创建 put。
+
+![image-20210714110940071](SpringBoot.assets/image-20210714110940071.png)
+
+![image-20210714111207234](SpringBoot.assets/image-20210714111207234.png)
+
+##### 4.6 @Cacheable  
+
+开启缓存注解 @EnableCaching
+
+```java
+package com.lagou;
+
+import org.mybatis.spring.annotation.MapperScan;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.cache.annotation.EnableCaching;
+
+@SpringBootApplication
+@MapperScan("com.lagou.mapper")
+@EnableCaching // 开启缓存
+public class Springboot04CacheApplication {
+
+	public static void main(String[] args) {
+		SpringApplication.run(Springboot04CacheApplication.class, args);
+	}
+
+}
+```
+
+@Cacheable 缓存
+
+```java
+package com.lagou.service;
+
+import com.lagou.mapper.EmployeeMapper;
+import com.lagou.pojo.Employee;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheConfig;
+import org.springframework.cache.annotation.Cacheable;
+import org.springframework.stereotype.Service;
+
+@Service
+@CacheConfig(cacheNames = {"emp"})
+public class EmployeeService {
+
+	@Autowired
+	private EmployeeMapper employeeMapper;
+
+	/*
+	 * 	@Cacheable : 缓存查询：会将该方法的返回值存到缓存中
+	 *		value/cacheNames：指定缓存的名称 ，cacheManager是管理多个cache,以名称进行区分
+	 * 		key：缓存数据时指定key值 （key,value） ,默认是方法的参数值，也可以使用spEL来计算key的值
+	 * 		keyGenerator：key的生成策略，和key进行二选一 ，自定义keyGenerator
+	 * 		cacheManager：指定缓存管理器  redis:emp   ehcache:emp
+	 * 		cacheResolver: 功能跟cacheManager相同，二选一即可
+	 * 		condition：条件属性，满足这个条件才会进行缓存
+	 * 		unless: 否定条件：满足这个条件，不进行缓存
+	 * 		sync: 是否使用异步模式进行缓存 true
+	 *			(1) condition/unless 同时满足，不缓存
+	 * 			(2) sync的值为true的时候，unless不被支持
+	 */
+
+	@Cacheable(key = "#id", condition = "#id > 0", unless = "#result == null")
+	public Employee getEmpById(Integer id){
+		Employee emp = employeeMapper.getEmpById(id);
+		return emp;
+	}
+}
+```
+
+
+
+##### 4.7 @CachePut、@CacheEvict、@CacheConfig 
+
+* @**CachePut**
+
+  既调用方法，又更新缓存数据，一般用于更新操作，在更新缓存时一定要和想更新的缓存有相同的缓存名称和相同的key。
+
+  ![image-20210714112117474](SpringBoot.assets/image-20210714112117474.png)
+
+* @**CacheEvict**
+
+  缓存清除，清除缓存时要指明缓存的名字和key，相当于告诉数据库要删除哪个表中的哪条数据，key默认为参数的值 。
+
+  **属性：**
+
+  * value/cacheNames：缓存的名字
+  * key：缓存的键
+  * allEntries：是否清除指定缓存中的所有键值对，默认为false，设置为true时会清除缓存中的所有键值对，与key属性二选一使用  
+  * beforeInvocation：在@CacheEvict注解的方法调用之前清除指定缓存，默认为false，即在方法调用之后清除缓存，设置为true时则会在方法调用之前清除缓存(在方法调用之前还是之后清除缓存的区别在于方法调用时是否会出现异常，若不出现异常，这两种设置没有区别，若出现异常，设置为在方法调用之后清除缓存将不起作用，因为方法调用失败了)  
+
+  ![image-20210714112149091](SpringBoot.assets/image-20210714112149091.png)
+
+* @**CacheConfig**
+
+  标注在类上，抽取缓存相关注解的公共配置，可抽取的公共配置有缓存名字、主键生成器等。
+
+  比如通过@CacheConfig的cacheNames 属性指定缓存的名字之后，该类中的其他缓存注解就不必再写value或者cacheName了，会使用该名字作为value或cacheName的值，当然也遵循就近原则。
+
+![image-20210714112818777](SpringBoot.assets/image-20210714112818777.png)
+
+
+
+##### 4.8 基于 redis 的缓存实现
+
+###### 4.8.1 安装启动redis
+
+![image-20210714113012335](SpringBoot.assets/image-20210714113012335.png)
+
+###### 4.8.2 导入 redis starter 依赖
+
+```xml
+<dependency>
+	<groupId>org.springframework.boot</groupId>
+	<artifactId>spring-boot-starter-data-redis</artifactId>
+</dependency>
+```
+
+​		引入redis的starter之后，会在容器中加入redis相关的一些bean，其中有两个跟操作redis相关的：1） RedisTemplate，封装了操作各种数据类型的操作(stringRredisTemplate.opsForValue()、stringRredisTemplate.opsForList()等)  。2）StringRedisTemplate，用来操作字符串：key和value都是字符串。
+
+![image-20210714113517389](SpringBoot.assets/image-20210714113517389.png)
+
+###### 4.8.3 配置redis
+
+​		只需要配置redis的主机地址(端口默认即为6379，因此可以不指定)  
+
+```properties
+spring.redis.host=127.0.0.1
+```
+
+###### 4.8.4 自定义RedisCacheManager 
+
+​		使用redis存储对象时，该对象必须可序列化(实现Serializable接口)，否则会报错。
+
+<img src="SpringBoot.assets/image-20210714113938934.png" alt="image-20210714113938934" style="zoom: 33%;" />		
+
+​		SpringBoot默认采用的是JDK的对象序列化方式，我们可以切换为使用JSON格式进行对象的序列化操作，这时需要我们自定义序列化规则(当然我们也可以使用Json工具先将对象转化为Json格式之后再保存至redis，这样就无需自定义序列化)  。
+
+​		通过查看以下 RedisCacheConfiguration 源码，内部同样通过Redis连接工厂 RedisConnectionFactory 定义了一个缓存管理器RedisCacheManager；同时定制 RedisCacheManager 时，也默认使用JdkSerializationRedisSerializer序列化方式。如果想要使用自定义序列化方式的RedisCacheManager进行数据缓存操作，可以参考上述核心代码创建一个名为cacheManager的Bean组件，并在该组件中设置对应的序列化方式即可。
+
+```java
+/*
+ * Copyright 2012-2019 the original author or authors.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package org.springframework.boot.autoconfigure.cache;
+
+import java.util.LinkedHashSet;
+import java.util.List;
+
+import org.springframework.beans.factory.ObjectProvider;
+import org.springframework.boot.autoconfigure.AutoConfigureAfter;
+import org.springframework.boot.autoconfigure.cache.CacheProperties.Redis;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnClass;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration;
+import org.springframework.cache.CacheManager;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Conditional;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.ResourceLoader;
+import org.springframework.data.redis.cache.RedisCacheManager;
+import org.springframework.data.redis.cache.RedisCacheManager.RedisCacheManagerBuilder;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.serializer.JdkSerializationRedisSerializer;
+import org.springframework.data.redis.serializer.RedisSerializationContext.SerializationPair;
+
+/**
+ * Redis cache configuration.
+ *
+ * @author Stephane Nicoll
+ * @author Mark Paluch
+ * @author Ryon Day
+ */
+@Configuration(proxyBeanMethods = false)
+@ConditionalOnClass(RedisConnectionFactory.class)
+@AutoConfigureAfter(RedisAutoConfiguration.class)
+@ConditionalOnBean(RedisConnectionFactory.class)
+@ConditionalOnMissingBean(CacheManager.class)
+@Conditional(CacheCondition.class)
+class RedisCacheConfiguration {
+
+	@Bean
+	RedisCacheManager cacheManager(CacheProperties cacheProperties, CacheManagerCustomizers cacheManagerCustomizers,
+			ObjectProvider<org.springframework.data.redis.cache.RedisCacheConfiguration> redisCacheConfiguration,
+			ObjectProvider<RedisCacheManagerBuilderCustomizer> redisCacheManagerBuilderCustomizers,
+			RedisConnectionFactory redisConnectionFactory, ResourceLoader resourceLoader) {
+		RedisCacheManagerBuilder builder = RedisCacheManager.builder(redisConnectionFactory).cacheDefaults(
+				determineConfiguration(cacheProperties, redisCacheConfiguration, resourceLoader.getClassLoader()));
+		List<String> cacheNames = cacheProperties.getCacheNames();
+		if (!cacheNames.isEmpty()) {
+			builder.initialCacheNames(new LinkedHashSet<>(cacheNames));
+		}
+		redisCacheManagerBuilderCustomizers.orderedStream().forEach((customizer) -> customizer.customize(builder));
+		return cacheManagerCustomizers.customize(builder.build());
+	}
+
+	private org.springframework.data.redis.cache.RedisCacheConfiguration determineConfiguration(
+			CacheProperties cacheProperties,
+			ObjectProvider<org.springframework.data.redis.cache.RedisCacheConfiguration> redisCacheConfiguration,
+			ClassLoader classLoader) {
+		return redisCacheConfiguration.getIfAvailable(() -> createConfiguration(cacheProperties, classLoader));
+	}
+
+	private org.springframework.data.redis.cache.RedisCacheConfiguration createConfiguration(
+			CacheProperties cacheProperties, ClassLoader classLoader) {
+		Redis redisProperties = cacheProperties.getRedis();
+		org.springframework.data.redis.cache.RedisCacheConfiguration config = org.springframework.data.redis.cache.RedisCacheConfiguration
+				.defaultCacheConfig();
+		config = config.serializeValuesWith(
+				SerializationPair.fromSerializer(new JdkSerializationRedisSerializer(classLoader)));
+		if (redisProperties.getTimeToLive() != null) {
+			config = config.entryTtl(redisProperties.getTimeToLive());
+		}
+		if (redisProperties.getKeyPrefix() != null) {
+			config = config.prefixKeysWith(redisProperties.getKeyPrefix());
+		}
+		if (!redisProperties.isCacheNullValues()) {
+			config = config.disableCachingNullValues();
+		}
+		if (!redisProperties.isUseKeyPrefix()) {
+			config = config.disableKeyPrefix();
+		}
+		return config;
+	}
+
+}
+```
+
+​		自定义 RedisCacheManager。在项目的Redis配置类RedisConfig中，按照上一步分析的定制方法自定义名为
+
+cacheManager的Bean组件 。
+
+```java
+package com.lagou;
+
+import com.fasterxml.jackson.annotation.JsonAutoDetect;
+import com.fasterxml.jackson.annotation.PropertyAccessor;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.data.redis.cache.RedisCacheConfiguration;
+import org.springframework.data.redis.cache.RedisCacheManager;
+import org.springframework.data.redis.connection.RedisConnectionFactory;
+import org.springframework.data.redis.serializer.Jackson2JsonRedisSerializer;
+import org.springframework.data.redis.serializer.RedisSerializationContext;
+import org.springframework.data.redis.serializer.RedisSerializer;
+import org.springframework.data.redis.serializer.StringRedisSerializer;
+
+import java.time.Duration;
+
+@Configuration
+public class RedisConfig {
+
+	@Bean
+	public RedisCacheManager cacheManager(RedisConnectionFactory redisConnectionFactory) {
+		// 分别创建String和JSON格式序列化对象，对缓存数据key和value进行转换
+		RedisSerializer<String> strSerializer = new StringRedisSerializer();
+		Jackson2JsonRedisSerializer jacksonSeial =
+				new Jackson2JsonRedisSerializer(Object.class);
+		// 解决查询缓存转换异常的问题
+		ObjectMapper om = new ObjectMapper();
+		om.setVisibility(PropertyAccessor.ALL, JsonAutoDetect.Visibility.ANY);
+		om.enableDefaultTyping(ObjectMapper.DefaultTyping.NON_FINAL);
+		jacksonSeial.setObjectMapper(om);
+		// 定制缓存数据序列化方式及时效
+		RedisCacheConfiguration config = RedisCacheConfiguration.defaultCacheConfig()
+				.entryTtl(Duration.ofDays(1))
+				.serializeKeysWith(RedisSerializationContext.SerializationPair
+						.fromSerializer(strSerializer))
+				.serializeValuesWith(RedisSerializationContext.SerializationPair
+						.fromSerializer(jacksonSeial))
+				.disableCachingNullValues();
+		RedisCacheManager cacheManager = RedisCacheManager
+				.builder(redisConnectionFactory).cacheDefaults(config).build();
+		return cacheManager;
+	}
+}
+```
+
+<img src="SpringBoot.assets/image-20210714195530899.png" alt="image-20210714195530899" style="zoom:50%;" />
+
+
+
 
 
 
