@@ -1607,39 +1607,367 @@ public class RedisConfig {
 
 
 
+#### 五、SpringBoot 打包部署
 
+##### 5.1 jar包
 
+​		SpringBoot 项目默认打成 jar 包。使用 SpringBoot 内置 tomcat 运行。服务器上只要配置了 jdk1.8 及以上就行。
 
+![image-20210715175425368](SpringBoot.assets/image-20210715175425368.png)
 
-#### 注解
+**打成 jar 包步骤**
 
-##### 	属性注入常用注解  
+1）pom.xml文件中导入Springboot的maven插件依赖
 
-###### 	@Configuration
-
-​			声明一个类作为配置类
-
-###### 	@Bean
-
-​			声明在方法上，将方法的返回值加入Bean容器
-
-###### 	@Value
-
-​			属性注入
-
-```java
-@Value("${com.location}")
-private String location;
+```xml
+<plugin>
+	<groupId>org.springframework.boot</groupId>
+	<artifactId>spring-boot-maven-plugin</artifactId>
+</plugin>
 ```
 
-###### 	@ConfigurationProperties
+2）执行 package
 
-​			批量属性注入，通常使用@EnableConfigurationProperties启用该注解用于启用
+<img src="SpringBoot.assets/image-20210715184401874.png" alt="image-20210715184401874" style="zoom:50%;" />
 
-![image-20210514011925107](SpringBoot.assets/image-20210514011925107.png)
+3）package完成以后，target中会生成一个jar包
 
-###### 	@PropertySource
+<img src="SpringBoot.assets/image-20210715184924263.png" alt="image-20210715184924263" style="zoom:50%;" />
 
-​			指定外部属性文件。在类上添加 
+4）上传到服务器上，运行 jar 包
 
-![image-20210514013946636](SpringBoot.assets/image-20210514013946636.png)
+```
+java -jar spring-boot-mytest-0.0.1-SNAPSHOT.jar
+```
+
+
+
+##### 5.2 war包
+
+1）将 pom.xml 修改为war
+
+<img src="SpringBoot.assets/image-20210715190141095.png" alt="image-20210715190141095" style="zoom:50%;" />
+
+2） pom.xml 添加 servlet-api 的依赖
+
+```xml
+<dependency>
+	<groupId>javax.servlet</groupId>
+	<artifactId>javax.servlet-api</artifactId>
+	<scope>provided</scope>
+</dependency>
+```
+
+3）排除springboot内置的tomcat  
+
+```xml
+<dependency>
+	<groupId>org.springframework.boot</groupId>
+	<artifactId>spring-boot-starter-web</artifactId>
+	<exclusions>
+		<exclusion>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-tomcat</artifactId>
+		</exclusion>
+	</exclusions>
+</dependency>
+```
+
+4）改造启动类
+
+​		如果是war包发布，需要增加SpringBootServletInitializer子类，并重写其configure方法，或者将main函数所在的类继承SpringBootServletInitializer，并重写configure方法当时打包为war时上传到tomcat服务器中访问项目始终报404错就是忽略了这个步骤。
+
+```java
+package com.lagou;
+
+import com.lagou.config.EnableRegisterServer;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.boot.builder.SpringApplicationBuilder;
+import org.springframework.boot.web.servlet.support.SpringBootServletInitializer;
+
+
+@SpringBootApplication//标注在类上说明这个类是`SpringBoot`的主配置类
+@EnableRegisterServer
+public class SpringBootMytestApplication extends SpringBootServletInitializer {
+
+	public static void main(String[] args) {
+		SpringApplication.run(SpringBootMytestApplication.class, args);
+	}
+
+	@Override
+	protected SpringApplicationBuilder configure(SpringApplicationBuilder builder) {
+		// 这里要指向核心启动类
+		return builder.sources(SpringBootMytestApplication.class);
+	}
+}
+```
+
+5）执行 package 后，target 下会生成一个 war 包
+
+![image-20210715190832570](SpringBoot.assets/image-20210715190832570.png)
+
+7）部署 war 包
+
+​		使用外部Tomcat运行该 war 文件（把 war 文件直接丢到 tomcat的webapps目录，启动 tomcat 。
+
+​		将项目打成war包，部署到外部的tomcat中，这个时候，不能直接访问spring boot 项目中配置文件配置的端口。application.yml中配置的server.port配置的是spring boot内置的tomcat的端口号, 打成war包部署在独立的tomcat上之后, 配置的server.port是不起作用的。  
+
+
+
+##### 5.3 多环境部署
+
+​		项目运行，不同的环境需要不同的配置。Spring Boot 提供了支持，一方面是注解@Profile，另一方面还有多资源配置文件。  
+
+###### 5.3.1 @Profile注解
+
+​		@profile 注解的作用是指定类或方法在特定的 Profile 环境生效，任何 @Component 或 @Configuration 注解的类都可以使用 @Profile 注解。在使用DI来依赖注入的时候，能够根据 @profile 指定的字符串标明环境，将注入符合当前运行环境的相应的bean。
+
+<img src="SpringBoot.assets/image-20210715202319251.png" alt="image-20210715202319251" style="zoom:50%;" />
+
+​		在resources/application.properties中添加下面的配置就可以指定对应环境。spring.profiles.active的取值应该与 @Profile 注解中的标示保持一致。
+
+```properties
+spring.profiles.active=prod
+```
+
+​		命令行方式指定  @Profile 环境
+
+```
+java -jar spring-boot-config-0.0.1-SNAPSHOT.jar --spring.profiles.active=prod
+```
+
+###### 5.3.2 多环境资源配置文件
+
+​		Springboot的资源配置文件除了application.properties之外，还可以有对应的资源文件application-{profile}.properties。
+
+<img src="SpringBoot.assets/image-20210715203708119.png" alt="image-20210715203708119" style="zoom:50%;" />
+
+​		不同的properties配置文件在 applcation.properties 配置文件中指定。  
+
+```properties
+spring.profiles.active = dev
+```
+
+
+
+#### 六、SpringBoot 监控
+
+##### 6.1 Acturator
+
+​		Actuator是spring boot的一个附加功能,可帮助你在应用程序生产环境时监视和管理应用程序。可以使用HTTP的各种请求来监管,审计,收集应用的运行情况。Spring Boot Actuator提供了对单个Spring Boot的监控，信息包含：应用状态、内存、线程、堆栈等等，比较全面的监控了SpringBoot应用的整个生命周期。特别对于微服务管理十分有意义。  
+
+###### 6.1.1 Acturator 的 REST 接口
+
+​		Actuator 监控分成两类：原生端点和用户自定义端点；自定义端点主要是指扩展性，用户可以根据自己的实际应用，定义一些比较关心的指标，在运行期进行监控。 
+
+​		Actuator 提供了 13 个接口。 
+
+![image-20210715234728847](SpringBoot.assets/image-20210715234728847.png)
+
+###### 6.1.2 使用 Actuator 
+
+​		导入 actuator 依赖。为了保证 actuator 暴露的监控接口的安全性，需要添加安全控制的依赖 spring-boot-startsecurity 依赖，访问应用监控端点时，都需要输入验证信息。Security 依赖，可以选择不加，不进行安全管理。
+
+```xml
+<dependency>
+	<groupId>org.springframework.boot</groupId>
+	<artifactId>spring-boot-starter-actuator</artifactId>
+</dependency>
+```
+
+配置文件
+
+```properties
+info.app.name=spring-boot-actuator
+info.app.version= 1.0.0
+info.app.test=test
+
+# *代表开启全部接口
+management.endpoints.web.exposure.include=*
+# 打开beans,trace接口
+# management.endpoints.web.exposure.include=beans,trace
+
+# 展示细节，除了always之外还有when-authorized、never，默认值是never
+management.endpoint.health.show-details=always
+
+# Actuator 默认所有的监控点路径都在 /actuator/*，这个路径也支持定制
+# 代表启用单独的url地址来监控 SpringBoot 应用
+# management.endpoints.web.base-path=/monitor
+
+# 启用接口关闭 SpringBoot
+management.endpoint.shutdown.enabled=true
+```
+
+###### 6.1.3 常用属性
+
+* **health**
+
+  ​		health 主要用来检查应用的运行状态，这是我们使用最高频的一个监控点。通常使用此接口提醒
+  我们应用实例的运行状态，以及应用不”健康“的原因，比如数据库连接、磁盘空间不够等 。 
+
+  ​		health 通过合并几个健康指数检查应用的健康情况。Spring Boot Actuator 有几个预定义的健康
+  指标比如 DataSourceHealthIndicator , DiskSpaceHealthIndicator ,MongoHealthIndicator , RedisHealthIndicator 等，它使用这些健康指标作为健康检查的一部分。如果你的应用使用 Redis，RedisHealthindicator 将被当作检查的一部分；如果使用 MongoDB，那么 MongoHealthIndicator 将被当作检查的一部分。  
+
+  ​		可以在配置文件中关闭特定的健康检查指标，比如关闭 redis 的健康检查：
+
+   ```properties
+  management.health.redise.enabled=false
+   ```
+  
+* **info**
+
+  ​		info 就是我们自己配置在配置文件中以 info 开头的配置信息，比如我们在示例项目中的配置是：
+
+  ```properties
+  info.app.name=spring-boot-actuator
+  info.app.version= 1.0.0
+  info.app.test= test
+  ```
+
+  ​		启动示例项目，访问： http://localhost:8080/actuator/info 返回部分信息如下：
+
+  ```json
+  {
+  	"app": {
+  		"name": "spring-boot-actuator",
+  		"version": "1.0.0",
+  		"test":"test"
+  	}
+  }
+  ```
+
+* **beans**
+
+  ​		bean 的别名、类型、是否单例、类的地址、依赖等信息。
+
+  ![image-20210716000909455](SpringBoot.assets/image-20210716000909455.png)
+
+  
+
+* **conditions**
+
+  ​		conditions 可以在应用运行时查看代码了某个配置在什么条件下生效，或者某个自动配置为什么
+  没有生效。
+
+  ![image-20210716000936635](SpringBoot.assets/image-20210716000936635.png)
+
+* **heapdump**
+
+  ​		返回一个 GZip 压缩的 JVM 堆 dump。使用 JDK 自带的 Jvm 监控工具 VisualVM 打开此文件查看内存快照。
+
+* **mappings**
+
+  ​		全部的 URI 路径，以及它们和控制器的映射关系。
+
+  ![image-20210716092402486](SpringBoot.assets/image-20210716092402486.png)
+
+* **threaddump**
+
+  ​		生成当前线程活动的快照。主要展示了线程名、线程ID、线程的状态、是否等待锁资源等信息。
+
+![image-20210716092530562](SpringBoot.assets/image-20210716092530562.png)
+
+
+
+##### 6.2 SpringBoot Admin
+
+​		Spring Boot Admin 是一个针对spring-boot的actuator接口进行UI美化封装的监控工具。他可以返回在列表中浏览所有被监控spring-boot项目的基本信息比如：Spring容器管理的所有的bean、详细的Health信息、内存信息、JVM信息、垃圾回收信息、各种配置信息（比如数据源、缓存列表和命中率）等，Threads 线程管理，Environment 管理等。
+
+![image-20210716092812541](SpringBoot.assets/image-20210716092812541.png)  
+
+###### **搭建Server端**
+
+**pom.xml**
+
+```xml
+<dependency>
+	<groupId>org.springframework.boot</groupId>
+	<artifactId>spring-boot-starter-web</artifactId>
+</dependency>
+<dependency>
+	<groupId>org.springframework.boot</groupId>
+	<artifactId>spring-boot-starter-actuator</artifactId>
+</dependency>
+<dependency>
+	<groupId>de.codecentric</groupId>
+	<artifactId>spring-boot-admin-starter-server</artifactId>
+</dependency>
+```
+
+**@EnableAdminServer**  
+
+```java
+package com.lagou.springboot_server;
+
+import de.codecentric.boot.admin.server.config.EnableAdminServer;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+@EnableAdminServer
+public class SpringbootServerApplication {
+
+	public static void main(String[] args) {
+		SpringApplication.run(SpringbootServerApplication.class, args);
+	}
+}
+```
+
+###### 搭建Client端
+
+**pom.xml**
+
+```xml
+<dependency>
+	<groupId>org.springframework.boot</groupId>
+	<artifactId>spring-boot-starter-web</artifactId>
+</dependency>
+<dependency>
+	<groupId>org.springframework.boot</groupId>
+	<artifactId>spring-boot-starter-actuator</artifactId>
+</dependency>
+<dependency>
+	<groupId>de.codecentric</groupId>
+	<artifactId>spring-boot-admin-starter-client</artifactId>
+	<version>2.1.0</version>
+</dependency>
+```
+
+**application.yml**
+
+```yaml
+server:
+  port: 8080
+#自定义配置信息用于"/actuator/info"读取
+info:
+  name: 老王
+  age: 100
+  phone: 110
+
+#通过下面的配置启用所有的监控端点，默认情况下，这些端点是禁用的；
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  endpoint:
+    health:
+      show-details: always
+
+## 将Client作为服务注册到Server，通过Server来监听项目的运行情况
+spring:
+  boot:
+    admin:
+      client:
+        url: http://localhost:8081
+  ##application实例名
+  application:
+    name : spring-boot-admin-client
+```
+
+
+
+**监控效果**
+
+![image-20210716094108792](SpringBoot.assets/image-20210716094108792.png)
